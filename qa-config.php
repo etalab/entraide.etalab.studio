@@ -36,8 +36,8 @@
 
 	define('QA_MYSQL_HOSTNAME', 'dokku-mysql-entraide');
         define('QA_MYSQL_PORT', '3306');
-	define('QA_MYSQL_PASSWORD', getenv('DATABASE_PASSWORD'));
 	define('QA_MYSQL_USERNAME', 'mysql');
+	define('QA_MYSQL_PASSWORD', getenv('DATABASE_PASSWORD'));
 	define('QA_MYSQL_DATABASE', 'entraide');
 
 /*
