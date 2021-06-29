@@ -49,9 +49,9 @@ Cette application est une plateforme d'échange et d'entraide pour les agents de
 
 - Créer un compte administrateur lors de la première connexion
 
-- Selectionner sur le site, une fois connecté.e avec le compte administrateur dans Admin > Général le [thème Etalab](https://github.com/etalab/q2a-theme-etalab) : 
--- Thème du site
--- Thème pour mobile
+- Selectionner sur le site, une fois connecté.e avec le compte administrateur dans Admin > Général le [thème Etalab](https://github.com/etalab/q2a-theme-etalab) :
+    - Thème du site
+    - Thème pour mobile
 
 ## Licence et contribution
 
