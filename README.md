@@ -1,62 +1,57 @@
-Question2Answer
------------------------------
+# Entraide.etalab.studio
+## Objectif
 
-[![Build Status](https://travis-ci.org/q2a/question2answer.png?branch=dev)](https://travis-ci.org/q2a/question2answer/branches)
+Cette application est une plateforme d'échange et d'entraide pour les agents de la mission Etalab.
 
-[Question2Answer][Q2A] (Q2A) is a popular free open source Q&A platform for PHP/MySQL, used by over 20,898 [sites] in 40 languages.
+## Ressources mobilisées
 
-Q2A is highly customisable with many awesome features:
+- [Question2Answer](https://github.com/q2a/question2answer)
+- [Thème Etalab q2a](https://github.com/etalab/q2a-theme-etalab) accessible reprenant le [Design Système de l'Etat](https://www.systeme-de-design.gouv.fr/)
 
-- Asking and answering questions (duh!)
-- Voting, comments, best answer selection, follow-on and closed questions.
-- Complete user management including points-based reputation management.
-- Create experts, editors, moderators and admins.
-- Fast integrated search engine, plus checking for similar questions when asking.
-- Categories (up to 4 levels deep) and/or tagging.
-- Easy styling with CSS themes.
-- Supports translation into any language.
-- Custom sidebar, widgets, pages and links.
-- SEO features such as neat URLs, microformats and XML Sitemaps.
-- RSS, email notifications and personal news feeds.
-- User avatars (or Gravatar) and custom fields.
-- Private messages and public wall posts.
-- Log in via Facebook or others (using plugins).
-- Out-of-the-box WordPress 3+ integration.
-- Out-of-the-box Joomla! 3.0+ integration (in conjunction with a Joomla! extension).
-- Custom single sign-on support for other sites.
-- PHP/MySQL scalable to millions of users and posts.
-- Safe from XSS, CSRF and SQL injection attacks.
-- Beat spam with captchas, rate-limiting, moderation and/or flagging.
-- Block users, IP addresses, and censor words
+## Déploiement
 
-Q2A also features an extensive plugin system:
+- Créer l'application avec `dokku apps:create <nom_application>`
+- Créer la base de données avec `dokku mariadb:create <nom_db>`
+- Lier la base de données à l'application `dokku mariadb:link <nom_db> <nom_application>`
 
-- Modify the HTML output for a page with *layers*.
-- Add custom pages to a Q2A site with *page modules*.
-- Add extra content in various places with *widget modules*.
-- Allow login via an external identity provider such as Facebook with *login modules*.
-- Integrate WYSIWYG or other text editors with *editor/viewer modules*.
-- Do something when certain actions take place with *event modules*.
-- Validate and/or modify many types of user input with *filter modules*.
-- Implement a custom search engine with *search modules*.
-- Add extra spam protection with *captcha modules*.
-- Extend many core Q2A functions using *function overrides*.
+**Attention** : La commande ci-dessus va afficher dans la console l'adresse de la base de donnée SQL sous cette forme : 
 
+`<protocole>://<nom_utilisateur>:<mot_de_passe>@<nom_hote>:<port>/<nom_db>`
 
-----------
+- Récupérer le projet avec `git clone https://github.com/etalab/entraide.etalab.studio.git`
 
+- Accéder au dossier avec `cd entraide.etalab.studio`
 
-As of version 1.6.3, all development is taking place through GitHub. The collaborative development process is being managed by [Scott Vivian][1]. (Note that official releases are still distributed via the [Q2A website][Q2A].)
+- Éditer le fichier `qa-config.php` à la racine du projet, il faut préciser les variables de connexion à la base de données :
 
-Please read the [contributing page][2] for more information on how to get involved.
+```
+    define('QA_MYSQL_HOSTNAME', '<nom_hote>');
+    define('QA_MYSQL_PORT', '<port>');
+    define('QA_MYSQL_USERNAME', '<nom_utilisateur>');
+    define('QA_MYSQL_PASSWORD', getenv('DATABASE_PASSWORD'));
+    define('QA_MYSQL_DATABASE', '<nom_db>');
+```
 
+- Préparer le push de la branche locale contenant les variables de connexion à la base de données :
 
-Thanks and enjoy!
+```
+  git remote add dokku sokku@<ip_serveur>:<nom_application>
+  git checkout -b deploy
+  git add qa-config.php
+  git commit -m "Credentials database"
+```
 
-Gideon
+- Configurer la variable d'environnement nécessaire avec `dokku config:set <nom_application> DATABASE_PASSWORD=<mot_de_passe>`
 
+- Déployer l'application avec `git push dokku deploy:master`
 
-[Q2A]: http://www.question2answer.org/
-[1]: http://www.question2answer.org/qa/user/Scott
-[2]: https://github.com/q2a/question2answer/blob/master/CONTRIBUTING.md
-[sites]: http://www.question2answer.org/sites.php
+**Attention** : En cas de problème, on peut forcer le push avec `git push -f dokku deploy:master`
+
+- Créer un compte administrateur lors de la première connexion
+
+- Selectionner sur le site, une fois connecté.e avec le compte administrateur dans Admin > Général le [thème Etalab](https://github.com/etalab/q2a-theme-etalab) : 
+-- Thème du site
+-- Thème pour mobile
+
+## Licence et contribution
+

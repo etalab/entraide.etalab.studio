@@ -24,6 +24,7 @@ if (!defined('QA_VERSION')) { // don't allow this page to be requested directly 
 	exit;
 }
 
+require_once QA_INCLUDE_DIR . 'app/routing.php';
 require_once QA_INCLUDE_DIR . 'app/cookies.php';
 require_once QA_INCLUDE_DIR . 'app/format.php';
 require_once QA_INCLUDE_DIR . 'app/users.php';
@@ -40,20 +41,21 @@ function qa_page_queue_pending()
 
 	qa_preload_options();
 	$loginuserid = qa_get_logged_in_userid();
+	$dbSelect = qa_service('dbselect');
 
 	if (isset($loginuserid)) {
 		if (!QA_FINAL_EXTERNAL_USERS)
-			qa_db_queue_pending_select('loggedinuser', qa_db_user_account_selectspec($loginuserid, true));
+			$dbSelect->queuePending('loggedinuser', qa_db_user_account_selectspec($loginuserid, true));
 
-		qa_db_queue_pending_select('notices', qa_db_user_notices_selectspec($loginuserid));
-		qa_db_queue_pending_select('favoritenonqs', qa_db_user_favorite_non_qs_selectspec($loginuserid));
-		qa_db_queue_pending_select('userlimits', qa_db_user_limits_selectspec($loginuserid));
-		qa_db_queue_pending_select('userlevels', qa_db_user_levels_selectspec($loginuserid, true));
+		$dbSelect->queuePending('notices', qa_db_user_notices_selectspec($loginuserid));
+		$dbSelect->queuePending('favoritenonqs', qa_db_user_favorite_non_qs_selectspec($loginuserid));
+		$dbSelect->queuePending('userlimits', qa_db_user_limits_selectspec($loginuserid));
+		$dbSelect->queuePending('userlevels', qa_db_user_levels_selectspec($loginuserid, true));
 	}
 
-	qa_db_queue_pending_select('iplimits', qa_db_ip_limits_selectspec(qa_remote_ip_address()));
-	qa_db_queue_pending_select('navpages', qa_db_pages_selectspec(array('B', 'M', 'O', 'F')));
-	qa_db_queue_pending_select('widgets', qa_db_widgets_selectspec());
+	$dbSelect->queuePending('iplimits', qa_db_ip_limits_selectspec(qa_remote_ip_address()));
+	$dbSelect->queuePending('navpages', qa_db_pages_selectspec(array('B', 'M', 'O', 'F')));
+	$dbSelect->queuePending('widgets', qa_db_widgets_selectspec());
 }
 
 
@@ -176,23 +178,44 @@ function qa_get_request_content()
 	$requestlower = strtolower(qa_request());
 	$requestparts = qa_request_parts();
 	$firstlower = strtolower($requestparts[0]);
+	$qa_content = [];
+	// old router
 	$routing = qa_page_routing();
+	// new router
+	$router = qa_service('router');
+	qa_controller_routing($router);
 
-	if (isset($routing[$requestlower])) {
-		qa_set_template($firstlower);
-		$qa_content = require QA_INCLUDE_DIR . $routing[$requestlower];
+	try {
+		// use new Controller system
+		$route = $router->match($requestlower);
+		if ($route !== null) {
+			qa_set_template($route->getOption('template'));
+			$controllerClass = $route->getController();
+			$ctrl = new $controllerClass(qa_service('database'));
 
-	} elseif (isset($routing[$firstlower . '/'])) {
-		qa_set_template($firstlower);
-		$qa_content = require QA_INCLUDE_DIR . $routing[$firstlower . '/'];
+			$qa_content = $ctrl->executeAction($route->getAction(), $route->getParameters());
+		}
+	} catch (\Exception $e) {
+		$qa_content = (new \Q2A\Exceptions\ExceptionHandler)->handle($e);
+	}
 
-	} elseif (is_numeric($requestparts[0])) {
-		qa_set_template('question');
-		$qa_content = require QA_INCLUDE_DIR . 'pages/question.php';
+	if (empty($qa_content)) {
+		if (isset($routing[$requestlower])) {
+			qa_set_template($firstlower);
+			$qa_content = require QA_INCLUDE_DIR . $routing[$requestlower];
 
-	} else {
-		qa_set_template(strlen($firstlower) ? $firstlower : 'qa'); // will be changed later
-		$qa_content = require QA_INCLUDE_DIR . 'pages/default.php'; // handles many other pages, including custom pages and page modules
+		} elseif (isset($routing[$firstlower . '/'])) {
+			qa_set_template($firstlower);
+			$qa_content = require QA_INCLUDE_DIR . $routing[$firstlower . '/'];
+
+		} elseif (is_numeric($requestparts[0])) {
+			qa_set_template('question');
+			$qa_content = require QA_INCLUDE_DIR . 'pages/question.php';
+
+		} else {
+			qa_set_template(strlen($firstlower) ? $firstlower : 'qa'); // will be changed later
+			$qa_content = require QA_INCLUDE_DIR . 'pages/default.php'; // handles many other pages, including custom pages and page modules
+		}
 	}
 
 	if ($firstlower == 'admin') {
@@ -208,8 +231,8 @@ function qa_get_request_content()
 
 
 /**
- *    Output the $qa_content via the theme class after doing some pre-processing, mainly relating to Javascript
- * @param $qa_content
+ * Output the $qa_content via the theme class after doing some pre-processing, mainly relating to Javascript
+ * @param array $qa_content
  * @return mixed
  */
 function qa_output_content($qa_content)
@@ -345,7 +368,7 @@ function qa_output_content($qa_content)
 		$qa_content['script'] = array();
 	}
 
-	$qa_content['script'] = array_merge($qa_content['script'], $script);
+	$qa_content['script'] = array_merge($script, $qa_content['script']);
 
 	// Load the appropriate theme class and output the page
 
@@ -363,7 +386,7 @@ function qa_output_content($qa_content)
 
 /**
  * Update any statistics required by the fields in $qa_content, and return true if something was done
- * @param $qa_content
+ * @param array $qa_content
  * @return bool
  */
 function qa_do_content_stats($qa_content)
@@ -387,68 +410,8 @@ function qa_do_content_stats($qa_content)
 // Other functions which might be called from anywhere
 
 /**
- * Return an array of the default Q2A requests and which /qa-include/pages/*.php file implements them
- * If the key of an element ends in /, it should be used for any request with that key as its prefix
- */
-function qa_page_routing()
-{
-	if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
-
-	return array(
-		'account' => 'pages/account.php',
-		'activity/' => 'pages/activity.php',
-		'admin/' => 'pages/admin/admin-default.php',
-		'admin/approve' => 'pages/admin/admin-approve.php',
-		'admin/categories' => 'pages/admin/admin-categories.php',
-		'admin/flagged' => 'pages/admin/admin-flagged.php',
-		'admin/hidden' => 'pages/admin/admin-hidden.php',
-		'admin/layoutwidgets' => 'pages/admin/admin-widgets.php',
-		'admin/moderate' => 'pages/admin/admin-moderate.php',
-		'admin/pages' => 'pages/admin/admin-pages.php',
-		'admin/plugins' => 'pages/admin/admin-plugins.php',
-		'admin/points' => 'pages/admin/admin-points.php',
-		'admin/recalc' => 'pages/admin/admin-recalc.php',
-		'admin/stats' => 'pages/admin/admin-stats.php',
-		'admin/userfields' => 'pages/admin/admin-userfields.php',
-		'admin/usertitles' => 'pages/admin/admin-usertitles.php',
-		'answers/' => 'pages/answers.php',
-		'ask' => 'pages/ask.php',
-		'categories/' => 'pages/categories.php',
-		'comments/' => 'pages/comments.php',
-		'confirm' => 'pages/confirm.php',
-		'favorites' => 'pages/favorites.php',
-		'favorites/questions' => 'pages/favorites-list.php',
-		'favorites/users' => 'pages/favorites-list.php',
-		'favorites/tags' => 'pages/favorites-list.php',
-		'feedback' => 'pages/feedback.php',
-		'forgot' => 'pages/forgot.php',
-		'hot/' => 'pages/hot.php',
-		'ip/' => 'pages/ip.php',
-		'login' => 'pages/login.php',
-		'logout' => 'pages/logout.php',
-		'messages/' => 'pages/messages.php',
-		'message/' => 'pages/message.php',
-		'questions/' => 'pages/questions.php',
-		'register' => 'pages/register.php',
-		'reset' => 'pages/reset.php',
-		'search' => 'pages/search.php',
-		'tag/' => 'pages/tag.php',
-		'tags' => 'pages/tags.php',
-		'unanswered/' => 'pages/unanswered.php',
-		'unsubscribe' => 'pages/unsubscribe.php',
-		'updates' => 'pages/updates.php',
-		'user/' => 'pages/user.php',
-		'users' => 'pages/users.php',
-		'users/blocked' => 'pages/users-blocked.php',
-		'users/new' => 'pages/users-newest.php',
-		'users/special' => 'pages/users-special.php',
-	);
-}
-
-
-/**
  * Sets the template which should be passed to the theme class, telling it which type of page it's displaying
- * @param $template
+ * @param string $template
  */
 function qa_set_template($template)
 {
@@ -477,8 +440,9 @@ function qa_content_prepare($voting = false, $categoryids = array())
 
 	$request = qa_request();
 	$requestlower = qa_request();
-	$navpages = qa_db_get_pending_result('navpages');
-	$widgets = qa_db_get_pending_result('widgets');
+	$dbSelect = qa_service('dbselect');
+	$navpages = $dbSelect->getPendingResult('navpages');
+	$widgets = $dbSelect->getPendingResult('widgets');
 
 	if (!is_array($categoryids)) {
 		// accept old-style parameter
@@ -750,7 +714,7 @@ function qa_content_prepare($voting = false, $categoryids = array())
 			}
 		}
 
-		$notices = qa_db_get_pending_result('notices');
+		$notices = $dbSelect->getPendingResult('notices');
 		foreach ($notices as $notice)
 			$qa_content['notices'][] = qa_notice_form($notice['noticeid'], qa_viewer_html($notice['content'], $notice['format']), $notice);
 

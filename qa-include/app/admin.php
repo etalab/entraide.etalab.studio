@@ -28,7 +28,7 @@ if (!defined('QA_VERSION')) { // don't allow this page to be requested directly 
 /**
  * Return true if user is logged in with admin privileges. If not, return false
  * and set up $qa_content with the appropriate title and error message
- * @param $qa_content
+ * @param array $qa_content
  * @return bool
  */
 function qa_admin_check_privileges(&$qa_content)
@@ -57,7 +57,8 @@ function qa_admin_check_privileges(&$qa_content)
 
 
 /**
- *	Return a sorted array of available languages, [short code] => [long name]
+ * Return a sorted array of available languages, [short code] => [long name]
+ * @return array
  */
 function qa_admin_language_options()
 {
@@ -121,7 +122,7 @@ function qa_admin_language_options()
 	$options = array('' => 'English (US)');
 
 	// find all language folders
-	$metadataUtil = new Q2A_Util_Metadata();
+	$metadataUtil = new \Q2A\Util\Metadata();
 	foreach (glob(QA_LANG_DIR . '*', GLOB_ONLYDIR) as $directory) {
 		$code = basename($directory);
 		$metadata = $metadataUtil->fetchFromAddonPath($directory);
@@ -140,12 +141,13 @@ function qa_admin_language_options()
 
 /**
  * Return a sorted array of available themes, [theme name] => [theme name]
+ * @return array
  */
 function qa_admin_theme_options()
 {
 	if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
 
-	$metadataUtil = new Q2A_Util_Metadata();
+	$metadataUtil = new \Q2A\Util\Metadata();
 	foreach (glob(QA_THEME_DIR . '*', GLOB_ONLYDIR) as $directory) {
 		$theme = basename($directory);
 		$metadata = $metadataUtil->fetchFromAddonPath($directory);
@@ -164,6 +166,7 @@ function qa_admin_theme_options()
 
 /**
  * Return an array of widget placement options, with keys matching the database value
+ * @return array
  */
 function qa_admin_place_options()
 {
@@ -186,7 +189,7 @@ function qa_admin_place_options()
 
 /**
  * Return an array of page size options up to $maximum, [page size] => [page size]
- * @param $maximum
+ * @param int $maximum
  * @return array
  */
 function qa_admin_page_size_options($maximum)
@@ -207,6 +210,7 @@ function qa_admin_page_size_options($maximum)
 
 /**
  * Return an array of options representing matching precision, [value] => [label]
+ * @return array
  */
 function qa_admin_match_options()
 {
@@ -223,8 +227,8 @@ function qa_admin_match_options()
 /**
  * Return an array of options representing permission restrictions, [value] => [label]
  * ranging from $widest to $narrowest. Set $doconfirms to whether email confirmations are on
- * @param $widest
- * @param $narrowest
+ * @param int $widest
+ * @param int $narrowest
  * @param bool $doconfirms
  * @param bool $dopoints
  * @return array
@@ -275,6 +279,7 @@ function qa_admin_permit_options($widest, $narrowest, $doconfirms = true, $dopoi
 
 /**
  * Return the sub navigation structure common to admin pages
+ * @return array
  */
 function qa_admin_sub_navigation()
 {
@@ -374,35 +379,37 @@ function qa_admin_sub_navigation()
 	}
 
 	if (!qa_user_maximum_permit_error('permit_moderate')) {
-		$count = qa_user_permit_error('permit_moderate') ? null : qa_opt('cache_queuedcount'); // if only in some categories don't show cached count
+		$count = qa_user_permit_error('permit_moderate') ? 0 : (int)qa_opt('cache_queuedcount'); // if only in some categories don't show cached count
 
 		$navigation['admin/moderate'] = array(
-			'label' => qa_lang_html('admin/moderate_title') . ($count ? (' (' . $count . ')') : ''),
+			'label' => qa_lang_html_sub('admin/moderate_title', '<span class="qa-nav-sub-counter-moderate">' . qa_html(qa_format_number($count)) . '</span>'),
 			'url' => qa_path_html('admin/moderate'),
 		);
 	}
 
 	if (qa_opt('flagging_of_posts') && !qa_user_maximum_permit_error('permit_hide_show')) {
-		$count = qa_user_permit_error('permit_hide_show') ? null : qa_opt('cache_flaggedcount'); // if only in some categories don't show cached count
+		$count = qa_user_permit_error('permit_hide_show') ? 0 : (int)qa_opt('cache_flaggedcount'); // if only in some categories don't show cached count
 
 		$navigation['admin/flagged'] = array(
-			'label' => qa_lang_html('admin/flagged_title') . ($count ? (' (' . $count . ')') : ''),
+			'label' => qa_lang_html_sub('admin/flagged_title', '<span class="qa-nav-sub-counter-flagged">' . qa_html(qa_format_number($count)) . '</span>'),
 			'url' => qa_path_html('admin/flagged'),
 		);
 	}
 
 	if (!qa_user_maximum_permit_error('permit_hide_show') || !qa_user_maximum_permit_error('permit_delete_hidden')) {
+		$count = qa_user_permit_error('permit_hide_show') ? 0 : (int)qa_opt('cache_hiddencount');
+
 		$navigation['admin/hidden'] = array(
-			'label' => qa_lang_html('admin/hidden_title'),
+			'label' => qa_lang_html_sub('admin/hidden_title', '<span class="qa-nav-sub-counter-hidden">' . qa_html(qa_format_number($count)) . '</span>'),
 			'url' => qa_path_html('admin/hidden'),
 		);
 	}
 
 	if (!QA_FINAL_EXTERNAL_USERS && qa_opt('moderate_users') && $level >= QA_USER_LEVEL_MODERATOR) {
-		$count = qa_opt('cache_uapprovecount');
+		$count = (int)qa_opt('cache_uapprovecount');
 
 		$navigation['admin/approve'] = array(
-			'label' => qa_lang_html('admin/approve_users_title') . ($count ? (' (' . $count . ')') : ''),
+			'label' => qa_lang_html_sub('admin/approve_users_title', '<span class="qa-nav-sub-counter-approve">' . qa_html(qa_format_number($count)) . '</span>'),
 			'url' => qa_path_html('admin/approve'),
 		);
 	}
@@ -413,6 +420,7 @@ function qa_admin_sub_navigation()
 
 /**
  * Return the error that needs to displayed on all admin pages, or null if none
+ * @return string|null
  */
 function qa_admin_page_error()
 {
@@ -439,6 +447,7 @@ function qa_admin_page_error()
 
 /**
  * Return an HTML fragment to display for a URL test which has passed
+ * @return string
  */
 function qa_admin_url_test_html()
 {
@@ -448,7 +457,7 @@ function qa_admin_url_test_html()
 
 /**
  * Returns whether a URL path beginning with $requestpart is reserved by the engine or a plugin page module
- * @param $requestpart
+ * @param string $requestpart
  * @return bool
  */
 function qa_admin_is_slug_reserved($requestpart)
@@ -490,8 +499,8 @@ function qa_admin_is_slug_reserved($requestpart)
 /**
  * Returns true if admin (hidden/flagged/approve/moderate) page $action performed on $entityid is permitted by the
  * logged in user and was processed successfully
- * @param $entityid
- * @param $action
+ * @param int $entityid
+ * @param string $action
  * @return bool
  */
 function qa_admin_single_click($entityid, $action)
@@ -582,7 +591,271 @@ function qa_admin_single_click($entityid, $action)
 
 
 /**
+ * Returns true if admin (hidden/flagged/approve/moderate) page $action performed on $entityid is permitted by the
+ * logged in user and was processed successfully
+ * @param int $entityid
+ * @param string $action
+ * @return array
+ */
+function qa_admin_single_click_array($entityid, $action)
+{
+	$userid = qa_get_logged_in_userid();
+
+	$response = array();
+
+	if (!QA_FINAL_EXTERNAL_USERS && ($action === 'userapprove' || $action === 'userblock')) { // approve/block moderated users
+		require_once QA_INCLUDE_DIR . 'db/selects.php';
+
+		$useraccount = qa_db_select_with_pending(qa_db_user_account_selectspec($entityid, true));
+
+		if (isset($useraccount) && qa_get_logged_in_level() >= QA_USER_LEVEL_MODERATOR) {
+			switch ($action) {
+				case 'userapprove':
+					if ($useraccount['level'] >= QA_USER_LEVEL_APPROVED) { // don't demote higher level users
+						$response['result'] = 'error';
+						$response['error']['type'] = 'user-already-approved';
+						$response['error']['message'] = qa_lang_html('main/general_error');
+					} else {
+						require_once QA_INCLUDE_DIR . 'app/users-edit.php';
+						qa_set_user_level($useraccount['userid'], $useraccount['handle'], QA_USER_LEVEL_APPROVED, $useraccount['level']);
+
+						$response['result'] = 'success';
+						$response['domUpdates'] = array(
+							array(
+								'selector' => '.qa-nav-sub-counter-approve',
+								'html' => max((int)qa_opt('cache_uapprovecount') - 1, 0),
+							),
+							array(
+								'selector' => '#p' . $entityid,
+								'action' => 'conceal',
+							),
+						);
+					}
+					break;
+
+				case 'userblock':
+					require_once QA_INCLUDE_DIR . 'app/users-edit.php';
+					qa_set_user_blocked($useraccount['userid'], $useraccount['handle'], true);
+
+					$response['result'] = 'success';
+					$response['domUpdates'] = array(
+						array(
+							'selector' => '.qa-nav-sub-counter-approve',
+							'html' => max((int)qa_opt('cache_uapprovecount') - 1, 0),
+						),
+						array(
+							'selector' => '#p' . $entityid,
+							'action' => 'conceal',
+						),
+					);
+					break;
+
+				default:
+			}
+		}
+	} else { // something to do with a post
+		require_once QA_INCLUDE_DIR . 'app/posts.php';
+
+		$post = qa_db_single_select(qa_db_full_post_selectspec(null, $entityid));
+
+		// Handle non-existent posts
+		if ($post === null) {
+			switch ($action) {
+				case 'approve':
+				case 'reject':
+					$entityCount = (int)qa_opt('cache_queuedcount');
+					$selector = '.qa-nav-sub-counter-moderate';
+					break;
+				case 'reshow':
+				case 'delete':
+					$entityCount = (int)qa_opt('cache_hiddencount');
+					$selector = '.qa-nav-sub-counter-hidden';
+					break;
+				case 'hide':
+				case 'clearflags':
+					$entityCount = (int)qa_opt('cache_flaggedcount');
+					$selector = '.qa-nav-sub-counter-flagged';
+					break;
+				default:
+					$selector = '';
+					$entityCount = 0;
+			}
+
+			return array(
+				'result' => 'error',
+				'error' => array(
+					'type' => 'post-not-found',
+					'message' => qa_lang_html('main/general_error'),
+				),
+				'domUpdates' => array(
+					array(
+						'selector' => $selector,
+						'html' => $entityCount,
+					),
+					array(
+						'selector' => '#p' . $entityid,
+						'action' => 'conceal',
+					),
+				),
+			);
+		}
+
+		$queued = (substr($post['type'], 1) == '_QUEUED');
+
+		switch ($action) {
+			case 'approve':
+			case 'reject':
+				$entityCount = (int)qa_opt('cache_queuedcount');
+				$hiddenCount = (int)qa_opt('cache_hiddencount');
+				if (!$queued) {
+					$response['result'] = 'error';
+					$response['error']['type'] = 'post-not-queued';
+					$response['error']['message'] = qa_lang_html('main/general_error');
+					$response['domUpdates'] = array(
+						array(
+							'selector' => '.qa-nav-sub-counter-moderate',
+							'html' => $entityCount,
+						),
+						array(
+							'selector' => '#p' . $entityid,
+							'action' => 'conceal',
+						),
+					);
+				} elseif (qa_user_post_permit_error('permit_moderate', $post) !== false) {
+					$response['result'] = 'error';
+					$response['error']['type'] = 'no-permission';
+					$response['error']['message'] = qa_lang_html('users/no_permission');
+					$response['error']['severity'] = 'fatal';
+				} else {
+					if ($action === 'approve') {
+						qa_post_set_status($entityid, QA_POST_STATUS_NORMAL, $userid);
+					} else { // 'reject'
+						qa_post_set_status($entityid, QA_POST_STATUS_HIDDEN, $userid);
+						$hiddenCount++;
+					}
+
+					$response['result'] = 'success';
+					$response['domUpdates'] = array(
+						array(
+							'selector' => '.qa-nav-sub-counter-moderate',
+							'html' => max($entityCount - 1, 0),
+						),
+						array(
+							'selector' => '.qa-nav-sub-counter-hidden',
+							'html' => $hiddenCount,
+						),
+						array(
+							'selector' => '#p' . $entityid,
+							'action' => 'conceal',
+						),
+					);
+				}
+				break;
+
+			case 'reshow':
+			case 'delete':
+				$entityCount = (int)qa_opt('cache_hiddencount');
+				if (!$post['hidden']) {
+					$response['result'] = 'error';
+					$response['error']['type'] = 'post-not-hidden';
+					$response['error']['message'] = qa_lang_html('main/general_error');
+					$response['domUpdates'] = array(
+						array(
+							'selector' => '.qa-nav-sub-counter-hidden',
+							'html' => $entityCount,
+						),
+						array(
+							'selector' => '#p' . $entityid,
+							'action' => 'conceal',
+						),
+					);
+				} elseif (qa_user_post_permit_error('permit_hide_show', $post) !== false) {
+					$response['result'] = 'error';
+					$response['error']['type'] = 'no-permission';
+					$response['error']['message'] = qa_lang_html('users/no_permission');
+					$response['error']['severity'] = 'fatal';
+				} else {
+					if ($action === 'reshow') {
+						qa_post_set_status($entityid, QA_POST_STATUS_NORMAL, $userid);
+					} else { // 'delete'
+						qa_post_delete($entityid);
+					}
+
+					$response['result'] = 'success';
+					$response['domUpdates'] = array(
+						array(
+							'selector' => '.qa-nav-sub-counter-hidden',
+							'html' => max($entityCount - 1, 0),
+						),
+						array(
+							'selector' => '#p' . $entityid,
+							'action' => 'conceal',
+						),
+					);
+				}
+				break;
+
+			case 'hide':
+			case 'clearflags':
+				$entityCount = (int)qa_opt('cache_flaggedcount');
+				$hiddenCount = (int)qa_opt('cache_hiddencount');
+				if ($action === 'hide' && $queued) {
+					$response['result'] = 'error';
+					$response['error']['type'] = 'post-queued';
+					$response['error']['message'] = qa_lang_html('main/general_error');
+					$response['domUpdates'] = array(
+						array(
+							'selector' => '.qa-nav-sub-counter-flagged',
+							'html' => $entityCount,
+						),
+						array(
+							'selector' => '#p' . $entityid,
+							'action' => 'conceal',
+						),
+					);
+				} elseif (qa_user_post_permit_error('permit_hide_show', $post) !== false) {
+					$response['result'] = 'error';
+					$response['error']['type'] = 'no-permission';
+					$response['error']['message'] = qa_lang_html('users/no_permission');
+					$response['error']['severity'] = 'fatal';
+				} else {
+					if ($action === 'hide') {
+						qa_post_set_status($entityid, QA_POST_STATUS_HIDDEN, $userid);
+						$hiddenCount++;
+					} else { // 'clearflags'
+						require_once QA_INCLUDE_DIR . 'app/votes.php';
+						qa_flags_clear_all($post, $userid, qa_get_logged_in_handle(), null);
+					}
+
+					$response['result'] = 'success';
+					$response['domUpdates'] = array(
+						array(
+							'selector' => '.qa-nav-sub-counter-flagged',
+							'html' => max($entityCount - 1, 0),
+						),
+						array(
+							'selector' => '.qa-nav-sub-counter-hidden',
+							'html' => $hiddenCount,
+						),
+						array(
+							'selector' => '#p' . $entityid,
+							'action' => 'conceal',
+						),
+					);
+				}
+				break;
+
+			default:
+		}
+	}
+
+	return $response;
+}
+
+
+/**
  * Checks for a POSTed click on an admin (hidden/flagged/approve/moderate) page, and refresh the page if processed successfully (non Ajax)
+ * @return string|null
  */
 function qa_admin_check_clicks()
 {
@@ -613,8 +886,8 @@ function qa_admin_check_clicks()
  * Retrieve metadata information from the $contents of a qa-theme.php or qa-plugin.php file, mapping via $fields.
  *
  * @deprecated Deprecated from 1.7; use `qa_addon_metadata($contents, $type)` instead.
- * @param $contents
- * @param $fields
+ * @param string $contents
+ * @param array $fields
  * @return array
  */
 function qa_admin_addon_metadata($contents, $fields)
@@ -632,12 +905,12 @@ function qa_admin_addon_metadata($contents, $fields)
 
 /**
  * Return the hash code for the plugin in $directory (without trailing slash), used for in-page navigation on admin/plugins page
- * @param $directory
+ * @param string $directory
  * @return mixed
  */
 function qa_admin_plugin_directory_hash($directory)
 {
-	$pluginManager = new Q2A_Plugin_PluginManager();
+	$pluginManager = new \Q2A\Plugin\PluginManager();
 	$hashes = $pluginManager->getHashesForPlugins(array($directory));
 
 	return reset($hashes);
@@ -646,7 +919,7 @@ function qa_admin_plugin_directory_hash($directory)
 
 /**
  * Return the URL (relative to the current page) to navigate to the options panel for the plugin in $directory (without trailing slash)
- * @param $directory
+ * @param string $directory
  * @return mixed|string
  */
 function qa_admin_plugin_options_path($directory)
@@ -658,8 +931,8 @@ function qa_admin_plugin_options_path($directory)
 
 /**
  * Return the URL (relative to the current page) to navigate to the options panel for plugin module $name of $type
- * @param $type
- * @param $name
+ * @param string $type
+ * @param string $name
  * @return mixed|string
  */
 function qa_admin_module_options_path($type, $name)

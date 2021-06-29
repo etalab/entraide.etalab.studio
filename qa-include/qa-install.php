@@ -34,7 +34,7 @@ qa_report_process_stage('init_install');
 if (!function_exists('qa_install_db_fail_handler')) {
 	/**
 	 * Handler function for database failures during the installation process
-	 * @param $type
+	 * @param string $type
 	 * @param int $errno
 	 * @param string $error
 	 * @param string $query
@@ -280,7 +280,7 @@ if (qa_db_connection(false) !== null && !@$pass_failure_from_install) {
 				$fields = array(
 					'handle' => array('label' => 'Username:', 'type' => 'text'),
 					'password' => array('label' => 'Password:', 'type' => 'password'),
-					'email' => array('label' => 'Email address:', 'type' => 'text'),
+					'email' => array('label' => 'Email address:', 'type' => 'email'),
 				);
 				$buttons = array('super' => 'Set up the Super Administrator');
 			}

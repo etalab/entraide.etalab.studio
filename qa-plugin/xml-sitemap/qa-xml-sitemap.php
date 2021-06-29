@@ -59,11 +59,11 @@ class qa_xml_sitemap
 		}
 
 		$form = array(
-			'ok' => $saved ? 'XML sitemap settings saved' : null,
+			'ok' => $saved ? qa_lang_html('admin/options_saved') : null,
 
 			'fields' => array(
 				'questions' => array(
-					'label' => 'Include question pages',
+					'label' => qa_lang_html('xml_sitemap/include_q_pages'),
 					'type' => 'checkbox',
 					'value' => (int)qa_opt('xml_sitemap_show_questions'),
 					'tags' => 'name="xml_sitemap_show_questions_field"',
@@ -72,7 +72,7 @@ class qa_xml_sitemap
 
 			'buttons' => array(
 				array(
-					'label' => 'Save Changes',
+					'label' => qa_lang_html('main/save_button'),
 					'tags' => 'name="xml_sitemap_save_button"',
 				),
 			),
@@ -80,7 +80,7 @@ class qa_xml_sitemap
 
 		if (!QA_FINAL_EXTERNAL_USERS) {
 			$form['fields']['users'] = array(
-				'label' => 'Include user pages',
+				'label' => qa_lang_html('xml_sitemap/include_user_pages'),
 				'type' => 'checkbox',
 				'value' => (int)qa_opt('xml_sitemap_show_users'),
 				'tags' => 'name="xml_sitemap_show_users_field"',
@@ -89,7 +89,7 @@ class qa_xml_sitemap
 
 		if (qa_using_tags()) {
 			$form['fields']['tagqs'] = array(
-				'label' => 'Include question list for each tag',
+				'label' => qa_lang_html('xml_sitemap/include_ql_tag'),
 				'type' => 'checkbox',
 				'value' => (int)qa_opt('xml_sitemap_show_tag_qs'),
 				'tags' => 'name="xml_sitemap_show_tag_qs_field"',
@@ -98,14 +98,14 @@ class qa_xml_sitemap
 
 		if (qa_using_categories()) {
 			$form['fields']['categoryqs'] = array(
-				'label' => 'Include question list for each category',
+				'label' => qa_lang_html('xml_sitemap/include_ql_category'),
 				'type' => 'checkbox',
 				'value' => (int)qa_opt('xml_sitemap_show_category_qs'),
 				'tags' => 'name="xml_sitemap_show_category_qs_field"',
 			);
 
 			$form['fields']['categories'] = array(
-				'label' => 'Include category browser',
+				'label' => qa_lang_html('xml_sitemap/include_cat_browser'),
 				'type' => 'checkbox',
 				'value' => (int)qa_opt('xml_sitemap_show_categories'),
 				'tags' => 'name="xml_sitemap_show_categories_field"',
@@ -120,7 +120,7 @@ class qa_xml_sitemap
 	{
 		return array(
 			array(
-				'title' => 'XML Sitemap',
+				'title' => qa_lang_html('xml_sitemap/xml_sitemap'),
 				'request' => 'sitemap.xml',
 				'nav' => null, // 'M'=main, 'F'=footer, 'B'=before main, 'O'=opposite main, null=none
 			),
@@ -137,6 +137,7 @@ class qa_xml_sitemap
 	public function process_request($request)
 	{
 		@ini_set('display_errors', 0); // we don't want to show PHP errors inside XML
+		$db = qa_service('database');
 
 		header('Content-type: text/xml; charset=utf-8');
 
@@ -147,17 +148,17 @@ class qa_xml_sitemap
 		// Question pages
 
 		if (qa_opt('xml_sitemap_show_questions')) {
-			$hotstats = qa_db_read_one_assoc(qa_db_query_sub(
+			$hotstats = $db->query(
 				"SELECT MIN(hotness) AS base, MAX(hotness)-MIN(hotness) AS spread FROM ^posts WHERE type='Q'"
-			));
+			)->fetchNextAssocOrFail();
 
 			$nextpostid = 0;
 
 			while (1) {
-				$questions = qa_db_read_all_assoc(qa_db_query_sub(
-					"SELECT postid, title, hotness FROM ^posts WHERE postid>=# AND type='Q' ORDER BY postid LIMIT 100",
-					$nextpostid
-				));
+				$questions = $db->query(
+					"SELECT postid, title, hotness FROM ^posts WHERE postid>=? AND type='Q' ORDER BY postid LIMIT 100",
+					[$nextpostid]
+				)->fetchAllAssoc();
 
 				if (!count($questions))
 					break;
@@ -177,10 +178,10 @@ class qa_xml_sitemap
 			$nextuserid = 0;
 
 			while (1) {
-				$users = qa_db_read_all_assoc(qa_db_query_sub(
-					"SELECT userid, handle FROM ^users WHERE userid>=# ORDER BY userid LIMIT 100",
-					$nextuserid
-				));
+				$users = $db->query(
+					"SELECT userid, handle FROM ^users WHERE userid>=? ORDER BY userid LIMIT 100",
+					[$nextuserid]
+				)->fetchAllAssoc();
 
 				if (!count($users))
 					break;
@@ -199,10 +200,10 @@ class qa_xml_sitemap
 			$nextwordid = 0;
 
 			while (1) {
-				$tagwords = qa_db_read_all_assoc(qa_db_query_sub(
-					"SELECT wordid, word, tagcount FROM ^words WHERE wordid>=# AND tagcount>0 ORDER BY wordid LIMIT 100",
-					$nextwordid
-				));
+				$tagwords = $db->query(
+					"SELECT wordid, word, tagcount FROM ^words WHERE wordid>=? AND tagcount>0 ORDER BY wordid LIMIT 100",
+					[$nextwordid]
+				)->fetchAllAssoc();
 
 				if (!count($tagwords))
 					break;
@@ -221,10 +222,10 @@ class qa_xml_sitemap
 			$nextcategoryid = 0;
 
 			while (1) {
-				$categories = qa_db_read_all_assoc(qa_db_query_sub(
-					"SELECT categoryid, backpath FROM ^categories WHERE categoryid>=# AND qcount>0 ORDER BY categoryid LIMIT 2",
-					$nextcategoryid
-				));
+				$categories = $db->query(
+					"SELECT categoryid, backpath FROM ^categories WHERE categoryid>=? AND qcount>0 ORDER BY categoryid LIMIT 2",
+					[$nextcategoryid]
+				)->fetchAllAssoc();
 
 				if (!count($categories))
 					break;
@@ -245,11 +246,11 @@ class qa_xml_sitemap
 			$nextcategoryid = 0;
 
 			while (1) { // only find categories with a child
-				$categories = qa_db_read_all_assoc(qa_db_query_sub(
+				$categories = $db->query(
 					"SELECT parent.categoryid, parent.backpath FROM ^categories AS parent " .
 					"JOIN ^categories AS child ON child.parentid=parent.categoryid WHERE parent.categoryid>=# GROUP BY parent.categoryid LIMIT 100",
-					$nextcategoryid
-				));
+					[$nextcategoryid]
+				)->fetchAllAssoc();
 
 				if (!count($categories))
 					break;

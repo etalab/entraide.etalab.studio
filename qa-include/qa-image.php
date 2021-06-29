@@ -26,7 +26,7 @@
 
 function qa_image_db_fail_handler()
 {
-	header('HTTP/1.1 500 Internal Server Error');
+	qa_500();
 	qa_exit('error');
 }
 
@@ -43,7 +43,7 @@ qa_report_process_stage('init_image');
 
 require_once QA_INCLUDE_DIR . 'db/cache.php';
 
-qa_db_connect('qa_image_db_fail_handler');
+$qa_db->connect('qa_image_db_fail_handler');
 qa_initialize_postdb_plugins();
 
 $blobid = qa_get('qa_blobid');
@@ -89,4 +89,4 @@ if (isset($content)) {
 	}
 }
 
-qa_db_disconnect();
+$qa_db->disconnect();

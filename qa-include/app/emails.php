@@ -24,19 +24,20 @@ if (!defined('QA_VERSION')) { // don't allow this page to be requested directly 
 	exit;
 }
 
-require_once QA_INCLUDE_DIR . 'app/options.php';
-
+use Q2A\Exceptions\FatalErrorException;
+use Q2A\Notifications\Email;
+use Q2A\Notifications\Mailer;
+use Q2A\Notifications\Status as NotifyStatus;
 
 /**
  * Suspend the sending of all email notifications via qa_send_notification(...) if $suspend is true, otherwise
  * reinstate it. A counter is kept to allow multiple calls.
  * @param bool $suspend
+ * @deprecated: Use \Q2A\Notifications\Status::suspend() instead.
  */
 function qa_suspend_notifications($suspend = true)
 {
-	global $qa_notifications_suspended;
-
-	$qa_notifications_suspended += ($suspend ? 1 : -1);
+	NotifyStatus::suspend($suspend);
 }
 
 
@@ -44,137 +45,46 @@ function qa_suspend_notifications($suspend = true)
  * Send email to person with $userid and/or $email and/or $handle (null/invalid values are ignored or retrieved from
  * user database as appropriate). Email uses $subject and $body, after substituting each key in $subs with its
  * corresponding value, plus applying some standard substitutions such as ^site_title, ^site_url, ^handle and ^email.
- * @param $userid
- * @param $email
- * @param $handle
- * @param $subject
- * @param $body
- * @param $subs
- * @param bool $html
- * @return bool
+ * If notifications are suspended, then a null value is returned.
+ * @param mixed $userid
+ * @param string $email
+ * @param string $handle
+ * @param string $subject
+ * @param string $body
+ * @param array $subs
+ * @param bool|false $html
+ * @return bool|null
  */
 function qa_send_notification($userid, $email, $handle, $subject, $body, $subs, $html = false)
 {
 	if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
 
-	global $qa_notifications_suspended;
-
-	if ($qa_notifications_suspended > 0)
-		return false;
-
-	require_once QA_INCLUDE_DIR . 'db/selects.php';
-	require_once QA_INCLUDE_DIR . 'util/string.php';
-
-	if (isset($userid)) {
-		$needemail = !qa_email_validate(@$email); // take from user if invalid, e.g. @ used in practice
-		$needhandle = empty($handle);
-
-		if ($needemail || $needhandle) {
-			if (QA_FINAL_EXTERNAL_USERS) {
-				if ($needhandle) {
-					$handles = qa_get_public_from_userids(array($userid));
-					$handle = @$handles[$userid];
-				}
-
-				if ($needemail)
-					$email = qa_get_user_email($userid);
-
-			} else {
-				$useraccount = qa_db_select_with_pending(
-					array(
-						'columns' => array('email', 'handle'),
-						'source' => '^users WHERE userid = #',
-						'arguments' => array($userid),
-						'single' => true,
-					)
-				);
-
-				if ($needhandle)
-					$handle = @$useraccount['handle'];
-
-				if ($needemail)
-					$email = @$useraccount['email'];
-			}
-		}
+	if (NotifyStatus::isSuspended()) {
+		return null;
 	}
 
-	if (isset($email) && qa_email_validate($email)) {
-		$subs['^site_title'] = qa_opt('site_title');
-		$subs['^site_url'] = qa_opt('site_url');
-		$subs['^handle'] = $handle;
-		$subs['^email'] = $email;
-		$subs['^open'] = "\n";
-		$subs['^close'] = "\n";
-
-		return qa_send_email(array(
-			'fromemail' => qa_opt('from_email'),
-			'fromname' => qa_opt('site_title'),
-			'toemail' => $email,
-			'toname' => $handle,
-			'subject' => strtr($subject, $subs),
-			'body' => (empty($handle) ? '' : qa_lang_sub('emails/to_handle_prefix', $handle)) . strtr($body, $subs),
-			'html' => $html,
-		));
+	if ($userid) {
+		$sender = Email::createByUserID($userid, $email, $handle);
+	} else {
+		$sender = Email::createByEmailAddress($email, $handle);
 	}
 
-	return false;
+	return $sender->sendMessage($subject, $body, $subs, $html);
 }
 
 
 /**
  * Send the email based on the $params array - the following keys are required (some can be empty): fromemail,
  * fromname, toemail, toname, subject, body, html
- * @param $params
+ * @param array $params
  * @return bool
+ * @throws phpmailerException
  */
 function qa_send_email($params)
 {
 	if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
 
-	// @error_log(print_r($params, true));
-
-	require_once QA_INCLUDE_DIR . 'vendor/PHPMailer/PHPMailerAutoload.php';
-
-	PHPMailer::$validator = 'php';
-	$mailer = new PHPMailer();
-	$mailer->CharSet = 'utf-8';
-
-	$mailer->From = $params['fromemail'];
-	$mailer->Sender = $params['fromemail'];
-	$mailer->FromName = $params['fromname'];
-	$mailer->addAddress($params['toemail'], $params['toname']);
-	if (!empty($params['replytoemail'])) {
-		$mailer->addReplyTo($params['replytoemail'], $params['replytoname']);
-	}
-	$mailer->Subject = $params['subject'];
-	$mailer->Body = $params['body'];
-
-	if ($params['html'])
-		$mailer->isHTML(true);
-
-	if (qa_opt('smtp_active')) {
-		$mailer->isSMTP();
-		$mailer->Host = qa_opt('smtp_address');
-		$mailer->Port = qa_opt('smtp_port');
-
-		if (qa_opt('smtp_secure')) {
-			$mailer->SMTPSecure = qa_opt('smtp_secure');
-		} else {
-			$mailer->SMTPOptions = array(
-				'ssl' => array(
-					'verify_peer' => false,
-					'verify_peer_name' => false,
-					'allow_self_signed' => true,
-				),
-			);
-		}
-
-		if (qa_opt('smtp_authenticate')) {
-			$mailer->SMTPAuth = true;
-			$mailer->Username = qa_opt('smtp_username');
-			$mailer->Password = qa_opt('smtp_password');
-		}
-	}
+	$mailer = new Mailer($params);
 
 	$send_status = $mailer->send();
 	if (!$send_status) {

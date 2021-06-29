@@ -32,12 +32,12 @@ if (!defined('QA_VERSION')) { // don't allow this page to be requested directly 
  */
 function qa_db_increment_views($postid)
 {
-	$query = 'UPDATE ^posts SET views=views+1, lastviewip=UNHEX($) WHERE postid=# AND (lastviewip IS NULL OR lastviewip!=UNHEX($))';
+	$query = 'UPDATE ^posts SET views=views+1, lastviewip=UNHEX(?) WHERE postid=? AND (lastviewip IS NULL OR lastviewip!=UNHEX(?))';
 	$ipHex = bin2hex(@inet_pton(qa_remote_ip_address()));
 
-	qa_db_query_sub($query, $ipHex, $postid, $ipHex);
+	$result = qa_service('database')->query($query, [$ipHex, $postid, $ipHex]);
 
-	return qa_db_affected_rows() > 0;
+	return $result->affectedRows() > 0;
 }
 
 
@@ -46,9 +46,9 @@ function qa_db_increment_views($postid)
  *
  * @param int $firstpostid First post to recalculate (or only post if $lastpostid is null).
  * @param int $lastpostid Last post in the range to recalculate.
- * @param bool $viewincrement Deprecated - view counter is now incremented separately. Previously, would increment the post's
- *   views and include that in the hotness calculation.
- * @return void
+ * @param bool $viewincrement Deprecated - view counter is now incremented separately. Previously, would increment the
+ * post's views and include that in the hotness calculation.
+ * @return mixed
  */
 function qa_db_hotness_update($firstpostid, $lastpostid = null, $viewincrement = false)
 {

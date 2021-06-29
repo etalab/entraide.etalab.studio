@@ -51,7 +51,7 @@ class qa_wysiwyg_upload
 					$url = $upload['bloburl'];
 				}
 			} else {
-				$message = qa_lang('users/no_permission');
+				$message = qa_lang_html('users/no_permission');
 			}
 		}
 

@@ -26,7 +26,7 @@
 
 function qa_blob_db_fail_handler()
 {
-	header('HTTP/1.1 500 Internal Server Error');
+	qa_500();
 	qa_exit('error');
 }
 
@@ -43,7 +43,7 @@ qa_report_process_stage('init_blob');
 
 require_once QA_INCLUDE_DIR . 'app/blobs.php';
 
-qa_db_connect('qa_blob_db_fail_handler');
+$qa_db->connect('qa_blob_db_fail_handler');
 qa_initialize_postdb_plugins();
 
 $blob = qa_read_blob(qa_get('qa_blobid'));
@@ -89,7 +89,7 @@ if (isset($blob) && isset($blob['content'])) {
 	echo $blob['content'];
 
 } else {
-	header('HTTP/1.0 404 Not Found');
+	qa_404();
 }
 
-qa_db_disconnect();
+$qa_db->disconnect();

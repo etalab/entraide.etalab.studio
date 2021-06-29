@@ -57,7 +57,7 @@ if (count($questions) > 0) {
 	$qa_content['title'] = qa_lang_html_sub('main/questions_tagged_x', qa_html($tag));
 } else {
 	$qa_content['title'] = qa_lang_html('main/no_questions_found');
-	header('HTTP/1.0 404 Not Found');
+	qa_404();
 }
 
 if (isset($userid) && isset($tagword)) {
@@ -89,7 +89,7 @@ $qa_content['page_links'] = qa_html_page_links(qa_request(), $start, $pagesize, 
 if (empty($qa_content['page_links']))
 	$qa_content['suggest_next'] = qa_html_suggest_qs_tags(true);
 
-if (qa_opt('feed_for_tag_qs')) {
+if (qa_opt('feed_for_tag_qs') && count($questions) > 0) {
 	$qa_content['feed'] = array(
 		'url' => qa_path_html(qa_feed_request('tag/' . $tag)),
 		'label' => qa_lang_html_sub('main/questions_tagged_x', qa_html($tag)),

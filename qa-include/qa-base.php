@@ -25,25 +25,21 @@ define('QA_BUILD_DATE', '2020-07-15');
 
 
 /**
- * Autoloads some Q2A classes so it's possible to use them without adding a require_once first. From version 1.7 onwards.
- * These loosely follow PHP-FIG's PSR-0 standard where faux namespaces are separated by underscores. This is being done
- * slowly and carefully to maintain backwards compatibility, and does not apply to plugins, themes, nor most of the core
- * for that matter.
+ * Autoloads some Q2A classes so it's possible to use them without adding a require_once first. From
+ * version 1.9 onwards we follow PSR-4. Classes are stored in qa-src/ which maps to the 'Q2A' namespace.
+ * So for example \Q2A\Storage\CacheFactory maps to qa-src/Storage/CacheFactory.php.
  *
- * Classes are stored in the qa-include/Q2A folder, and then in subfolders depending on their categorization.
- * Class names should be of the form Q2A_<Namespace>_<Class>, e.g. Q2A_Util_Debug. There may be multiple "namespaces".
- * Classes are mapped to PHP files with the underscores converted to directory separators. The Q2A_Util_Debug class is in
- * the file qa-include/Q2A/Util/Debug.php. A class named Q2A_Db_User_Messages would be in a file qa-include/Q2A/Db/User/Messages.php.
- *
- * @param $class
+ * @param string $class
  */
 function qa_autoload($class)
 {
-	if (strpos($class, 'Q2A_') === 0)
-		require QA_INCLUDE_DIR . strtr($class, '_', '/') . '.php';
+	if (strpos($class, 'Q2A\\') === 0) {
+		require QA_BASE_DIR . 'qa-src/' . strtr(substr($class, 4), '\\', '/') . '.php';
+	}
 }
 spl_autoload_register('qa_autoload');
 
+use Q2A\App\Application;
 
 // Execution section of this file - remainder contains function definitions
 
@@ -58,19 +54,19 @@ if (defined('QA_WORDPRESS_LOAD_FILE')) {
 	require_once QA_JOOMLA_LOAD_FILE;
 }
 
-
 qa_initialize_constants_2();
 qa_initialize_modularity();
 qa_register_core_modules();
 
 qa_initialize_predb_plugins();
 require_once QA_INCLUDE_DIR . 'qa-db.php';
-qa_db_allow_connect();
+$qa_db = qa_service('database');
+$qa_db->allowConnect();
 
 // $qa_autoconnect defaults to true so that optional plugins will load for external code. Q2A core
 // code sets $qa_autoconnect to false so that we can use custom fail handlers.
 if (!isset($qa_autoconnect) || $qa_autoconnect !== false) {
-	qa_db_connect('qa_page_db_fail_handler');
+	$qa_db->connect('qa_page_db_fail_handler');
 	qa_initialize_postdb_plugins();
 }
 
@@ -81,7 +77,7 @@ if (!isset($qa_autoconnect) || $qa_autoconnect !== false) {
  * Converts the $version string (e.g. 1.6.2.2) to a floating point that can be used for greater/lesser comparisons
  * (PHP's version_compare() function is not quite suitable for our needs)
  * @deprecated 1.8.2 no longer used
- * @param $version
+ * @param string $version
  * @return float
  */
 function qa_version_to_float($version)
@@ -104,7 +100,7 @@ function qa_version_to_float($version)
 
 /**
  * Returns true if the current Q2A version is lower than $version
- * @param $version
+ * @param string $version
  * @return bool
  */
 function qa_qa_version_below($version)
@@ -115,7 +111,7 @@ function qa_qa_version_below($version)
 
 /**
  * Returns true if the current PHP version is lower than $version
- * @param $version
+ * @param string $version
  * @return bool
  */
 function qa_php_version_below($version)
@@ -172,7 +168,7 @@ function qa_initialize_constants_1()
 	define('QA_CATEGORY_DEPTH', 4); // you can't change this number!
 
 	if (!defined('QA_BASE_DIR'))
-		define('QA_BASE_DIR', dirname(dirname(__FILE__)) . '/'); // try out best if not set in index.php or qa-index.php - won't work with symbolic links
+		define('QA_BASE_DIR', dirname(dirname(__FILE__)) . '/'); // try our best if not set in index.php or qa-index.php - won't work with symbolic links
 
 	define('QA_EXTERNAL_DIR', QA_BASE_DIR . 'qa-external/');
 	define('QA_INCLUDE_DIR', QA_BASE_DIR . 'qa-include/');
@@ -202,6 +198,8 @@ function qa_initialize_constants_1()
 			qa_fatal_error('Could not find configuration.php file for Joomla integration - please check QA_JOOMLA_INTEGRATE_PATH in qa-config.php');
 		}
 	}
+
+	require_once QA_INCLUDE_DIR . 'vendor/PHPMailer/PHPMailerAutoload.php';
 
 	// Polyfills
 
@@ -258,7 +256,7 @@ function qa_initialize_constants_2()
 
 	if (QA_DEBUG_PERFORMANCE) {
 		global $qa_usage;
-		$qa_usage = new Q2A_Util_Usage;
+		$qa_usage = new \Q2A\Util\Usage;
 		// ensure errors are displayed
 		@ini_set('display_errors', 'On');
 	}
@@ -343,7 +341,7 @@ function qa_initialize_modularity()
 
 /**
  * Set up output buffering. Use gzip compression if option set and it's not an admin page (since some of these contain lengthy processes).
- * @param $request
+ * @param string $request
  * @return bool whether buffering was used
  */
 function qa_initialize_buffering($request = '')
@@ -384,7 +382,7 @@ function qa_register_core_modules()
 function qa_initialize_predb_plugins()
 {
 	global $qa_pluginManager;
-	$qa_pluginManager = new Q2A_Plugin_PluginManager();
+	$qa_pluginManager = new \Q2A\Plugin\PluginManager();
 	$qa_pluginManager->readAllPluginMetadatas();
 
 	$qa_pluginManager->loadPluginsBeforeDbInit();
@@ -411,10 +409,10 @@ function qa_initialize_postdb_plugins()
 
 /**
  * Standard database failure handler function which bring up the install/repair/upgrade page
- * @param $type
- * @param int $errno
- * @param string $error
- * @param string $query
+ * @param string $type
+ * @param int|null $errno
+ * @param string|null $error
+ * @param string|null $query
  * @return mixed
  */
 function qa_page_db_fail_handler($type, $errno = null, $error = null, $query = null)
@@ -437,10 +435,10 @@ function qa_page_db_fail_handler($type, $errno = null, $error = null, $query = n
  * If $versiononly is true, only min version metadata is parsed.
  * Name, Description, Min Q2A & Min PHP are not currently used by themes.
  *
- * @deprecated Deprecated from 1.7; Q2A_Util_Metadata class and metadata.json files should be used instead
- * @param $contents
- * @param $type
- * @param bool $versiononly
+ * @deprecated Deprecated from 1.7; \Q2A\Util\Metadata class and metadata.json files should be used instead
+ * @param string $contents
+ * @param string $type
+ * @param bool|null $versiononly
  * @return array
  */
 function qa_addon_metadata($contents, $type, $versiononly = false)
@@ -531,12 +529,12 @@ function qa_load_override_files()
 /**
  * Register a module of $type named $name, whose class named $class is defined in file $include (or null if no include necessary)
  * If this module comes from a plugin, pass in the local plugin $directory and the $urltoroot relative url for that directory
- * @param $type
- * @param $include
- * @param $class
- * @param $name
+ * @param string $type
+ * @param string $include
+ * @param string $class
+ * @param string $name
  * @param string $directory
- * @param string $urltoroot
+ * @param string|null $urltoroot
  */
 function qa_register_module($type, $include, $class, $name, $directory = QA_INCLUDE_DIR, $urltoroot = null)
 {
@@ -561,10 +559,10 @@ function qa_register_module($type, $include, $class, $name, $directory = QA_INCL
 /**
  * Register a layer named $name, defined in file $include. If this layer comes from a plugin (as all currently do),
  * pass in the local plugin $directory and the $urltoroot relative url for that directory
- * @param $include
- * @param $name
+ * @param string $include
+ * @param string $name
  * @param string $directory
- * @param string $urltoroot
+ * @param string|null $urltoroot
  */
 function qa_register_layer($include, $name, $directory = QA_INCLUDE_DIR, $urltoroot = null)
 {
@@ -588,9 +586,9 @@ function qa_register_layer($include, $name, $directory = QA_INCLUDE_DIR, $urltor
 /**
  * Register a file $include containing override functions. If this file comes from a plugin (as all currently do),
  * pass in the local plugin $directory and the $urltoroot relative url for that directory
- * @param $include
+ * @param string $include
  * @param string $directory
- * @param string $urltoroot
+ * @param string|null $urltoroot
  */
 function qa_register_overrides($include, $directory = QA_INCLUDE_DIR, $urltoroot = null)
 {
@@ -608,8 +606,8 @@ function qa_register_overrides($include, $directory = QA_INCLUDE_DIR, $urltoroot
  * Register a set of language phrases, which should be accessed by the prefix $name/ in the qa_lang_*() functions.
  * Pass in the $pattern representing the PHP files that define these phrases, where * in the pattern is replaced with
  * the language code (e.g. 'fr') and/or 'default'. These files should be formatted like Q2A's qa-lang-*.php files.
- * @param $pattern
- * @param $name
+ * @param string $pattern
+ * @param string $name
  */
 function qa_register_phrases($pattern, $name)
 {
@@ -633,10 +631,10 @@ function qa_register_phrases($pattern, $name)
 /**
  * Register a plugin module of $type named $name, whose class named $class is defined in file $include (or null if no include necessary)
  * This function relies on some global variable values and can only be called from a plugin's qa-plugin.php file
- * @param $type
- * @param $include
- * @param $class
- * @param $name
+ * @param string $type
+ * @param string $include
+ * @param string $class
+ * @param string $name
  */
 function qa_register_plugin_module($type, $include, $class, $name)
 {
@@ -652,8 +650,8 @@ function qa_register_plugin_module($type, $include, $class, $name)
 
 /**
  * Register a plugin layer named $name, defined in file $include. Can only be called from a plugin's qa-plugin.php file
- * @param $include
- * @param $name
+ * @param string $include
+ * @param string $name
  */
 function qa_register_plugin_layer($include, $name)
 {
@@ -669,7 +667,7 @@ function qa_register_plugin_layer($include, $name)
 
 /**
  * Register a plugin file $include containing override functions. Can only be called from a plugin's qa-plugin.php file
- * @param $include
+ * @param string $include
  */
 function qa_register_plugin_overrides($include)
 {
@@ -685,8 +683,8 @@ function qa_register_plugin_overrides($include)
 
 /**
  * Register a file name $pattern within a plugin directory containing language phrases accessed by the prefix $name
- * @param $pattern
- * @param $name
+ * @param string $pattern
+ * @param string $name
  */
 function qa_register_plugin_phrases($pattern, $name)
 {
@@ -705,8 +703,8 @@ function qa_register_plugin_phrases($pattern, $name)
 /**
  * Calls eval() on the PHP code in $eval which came from the file $filename. It supplements PHP's regular error reporting by
  * displaying/logging (as appropriate) the original source filename, if an error occurred when evaluating the code.
- * @param $eval
- * @param $filename
+ * @param string $eval
+ * @param string $filename
  */
 function qa_eval_from_file($eval, $filename)
 {
@@ -740,8 +738,8 @@ function qa_eval_from_file($eval, $filename)
 
 /**
  * Call $function with the arguments in the $args array (doesn't work with call-by-reference functions)
- * @param $function
- * @param $args
+ * @param string $function
+ * @param array $args
  * @return mixed
  */
 function qa_call($function, $args)
@@ -769,7 +767,6 @@ function qa_call($function, $args)
 /**
  * Determines whether a function is to be overridden by a plugin. But if the function is being called with
  * the _base suffix, any override will be bypassed due to $qa_direct.
- *
  * @param string $function The function to override
  * @return string|null The name of the overriding function (of the form `qa_functionname_override_1_in_filename`)
  */
@@ -797,8 +794,8 @@ function qa_to_override($function)
 
 /**
  * Call the function which immediately overrides $function with the arguments in the $args array
- * @param $function
- * @param $args
+ * @param string $function
+ * @param array $args
  * @return mixed
  */
 function qa_call_override($function, $args)
@@ -820,7 +817,7 @@ function qa_call_override($function, $args)
 
 /**
  * Exit PHP immediately after reporting a shutdown with $reason to any installed process modules
- * @param string $reason
+ * @param string|null $reason
  */
 function qa_exit($reason = null)
 {
@@ -833,7 +830,7 @@ function qa_exit($reason = null)
 
 /**
  * Display $message in the browser, write it to server error log, and then stop abruptly
- * @param $message
+ * @param string $message
  * @return mixed
  */
 function qa_fatal_error($message)
@@ -878,7 +875,7 @@ function qa_list_module_types()
 
 /**
  * Return a list of names of registered modules of $type
- * @param $type
+ * @param string $type
  * @return array
  */
 function qa_list_modules($type)
@@ -889,8 +886,8 @@ function qa_list_modules($type)
 
 /**
  * Return an array containing information about the module of $type named $name
- * @param $type
- * @param $name
+ * @param string $type
+ * @param string $name
  * @return array
  */
 function qa_get_module_info($type, $name)
@@ -901,8 +898,8 @@ function qa_get_module_info($type, $name)
 
 /**
  * Return an instantiated class for module of $type named $name, whose functions can be called, or null if it doesn't exist
- * @param $type
- * @param $name
+ * @param string $type
+ * @param string $name
  * @return mixed|null
  */
 function qa_load_module($type, $name)
@@ -935,7 +932,7 @@ function qa_load_module($type, $name)
 /**
  * Return an array of instantiated clases for modules which have defined $method
  * (all modules are loaded but not included in the returned array)
- * @param $method
+ * @param string $method
  * @return array
  */
 function qa_load_all_modules_with($method)
@@ -959,8 +956,8 @@ function qa_load_all_modules_with($method)
 /**
  * Return an array of instantiated clases for modules of $type which have defined $method
  * (other modules of that type are also loaded but not included in the returned array)
- * @param $type
- * @param $method
+ * @param string $type
+ * @param string $method
  * @return array
  */
 function qa_load_modules_with($type, $method)
@@ -984,13 +981,13 @@ function qa_load_modules_with($type, $method)
 
 /**
  * Return HTML representation of $string, work well with blocks of text if $multiline is true
- * @param $string
+ * @param string $string
  * @param bool $multiline
- * @return mixed|string
+ * @return string
  */
 function qa_html($string, $multiline = false)
 {
-	$html = htmlspecialchars((string)$string);
+	$html = htmlspecialchars($string);
 
 	if ($multiline) {
 		$html = preg_replace('/\r\n?/', "\n", $html);
@@ -1007,10 +1004,10 @@ function qa_html($string, $multiline = false)
  * Return $html after ensuring it is safe, i.e. removing Javascripts and the like - uses htmLawed library
  * Links open in a new window if $linksnewwindow is true. Set $storage to true if sanitization is for
  * storing in the database, rather than immediate display to user - some think this should be less strict.
- * @param $html
+ * @param string $html
  * @param bool $linksnewwindow
  * @param bool $storage
- * @return mixed|string
+ * @return string
  */
 function qa_sanitize_html($html, $linksnewwindow = false, $storage = false)
 {
@@ -1037,7 +1034,7 @@ function qa_sanitize_html($html, $linksnewwindow = false, $storage = false)
 
 /**
  * htmLawed hook function used to process tags in qa_sanitize_html(...)
- * @param $element
+ * @param string $element
  * @param array $attributes
  * @return string
  */
@@ -1067,19 +1064,19 @@ function qa_sanitize_html_hook_tag($element, $attributes = null)
 
 /**
  * Return XML representation of $string, which is similar to HTML but ASCII control characters are also disallowed
- * @param $string
+ * @param string $string
  * @return string
  */
 function qa_xml($string)
 {
-	return htmlspecialchars(preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', (string)$string));
+	return htmlspecialchars(preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $string));
 }
 
 
 /**
  * Return JavaScript representation of $value, putting in quotes if non-numeric or if $forcequotes is true. In the
  * case of boolean values they are returned as the appropriate true or false string
- * @param $value
+ * @param mixed $value
  * @param bool $forcequotes
  * @return string
  */
@@ -1106,9 +1103,9 @@ function qa_js($value, $forcequotes = false)
 /**
  * Inform Q2A that the current request is $request (slash-separated, independent of the url scheme chosen),
  * that the relative path to the Q2A root apperas to be $relativeroot, and the url scheme appears to be $usedformat
- * @param $request
- * @param $relativeroot
- * @param $usedformat
+ * @param string $request
+ * @param string $relativeroot
+ * @param int|null $usedformat
  * @return mixed
  */
 function qa_set_request($request, $relativeroot, $usedformat = null)
@@ -1125,6 +1122,7 @@ function qa_set_request($request, $relativeroot, $usedformat = null)
 
 /**
  * Returns the current Q2A request (slash-separated, independent of the url scheme chosen)
+ * @return string
  */
 function qa_request()
 {
@@ -1137,8 +1135,8 @@ function qa_request()
 
 /**
  * Returns the indexed $part (as separated by slashes) of the current Q2A request, or null if it doesn't exist
- * @param $part
- * @return
+ * @param int $part
+ * @return string
  */
 function qa_request_part($part)
 {
@@ -1160,8 +1158,8 @@ function qa_request_parts($start = 0)
 
 /**
  * Return string for incoming GET/POST/COOKIE value, stripping slashes if appropriate
- * @param $string
- * @return mixed|string
+ * @param string $string
+ * @return string
  */
 function qa_gpc_to_string($string)
 {
@@ -1177,8 +1175,8 @@ function qa_gpc_to_string($string)
 
 /**
  * Return string with slashes added, if appropriate for later removal by qa_gpc_to_string()
- * @param $string
- * @return mixed|string
+ * @param string $string
+ * @return string
  */
 function qa_string_to_gpc($string)
 {
@@ -1194,8 +1192,8 @@ function qa_string_to_gpc($string)
 
 /**
  * Return string for incoming GET field, or null if it's not defined
- * @param $field
- * @return mixed|null|string
+ * @param string $field
+ * @return mixed|null
  */
 function qa_get($field)
 {
@@ -1208,7 +1206,7 @@ function qa_get($field)
 /**
  * Return string for incoming POST field, or null if it's not defined.
  * While we're at it, trim() surrounding white space and converted to Unix line endings.
- * @param $field
+ * @param string $field
  * @return mixed|null
  */
 function qa_post_text($field)
@@ -1221,8 +1219,8 @@ function qa_post_text($field)
 /**
  * Return an array for incoming POST field, or null if it's not an array or not defined.
  * While we're at it, trim() surrounding white space for each value and convert them to Unix line endings.
- * @param $field
- * @return array|mixed|null
+ * @param string $field
+ * @return mixed|null
  */
 function qa_post_array($field)
 {
@@ -1243,8 +1241,8 @@ function qa_post_array($field)
 /**
  * Return true if form button $name was clicked (as type=submit/image) to create this page request, or if a
  * simulated click was sent for the button (via 'qa_click' POST field)
- * @param $name
- * @return bool|mixed
+ * @param string $name
+ * @return bool
  */
 function qa_clicked($name)
 {
@@ -1256,7 +1254,7 @@ function qa_clicked($name)
 
 /**
  * Determine the remote IP address of the user accessing the site.
- * @return mixed  String representing IP if it's available, or null otherwise.
+ * @return string|null  String representing IP if it's available, or null otherwise.
  */
 function qa_remote_ip_address()
 {
@@ -1271,6 +1269,7 @@ function qa_remote_ip_address()
  * is too big to be properly processed by PHP, usually because there is an attachment in the HTTP request. A warning
  * is added to the server's log displaying the size of the file that triggered this situation. It is important to note
  * that whenever this happens the $_POST and $_FILES superglobals are empty.
+ * @return bool
  */
 function qa_post_limit_exceeded()
 {
@@ -1284,16 +1283,18 @@ function qa_post_limit_exceeded()
 		$postmaxsize = convert_to_bytes($unit, $postmaxsize);
 		return $_SERVER['CONTENT_LENGTH'] > $postmaxsize;
 	}
+
+	return false;
 }
 
 
 /**
-* Turns a numeric value and a unit (g/m/k) into bytes
-* @param string $unit One of 'g', 'm', 'k'. It is case insensitive
-* @param int $value The value to turn into bytes
-* @return int The amount of bytes the unit and the value represent. If the unit is not one of 'g', 'm' or 'k' then
-* the original value is returned
-*/
+ * Turns a numeric value and a unit (g/m/k) into bytes
+ * @param string $unit One of 'g', 'm', 'k'. It is case insensitive
+ * @param int $value The value to turn into bytes
+ * @return int The amount of bytes the unit and the value represent. If the unit is not one of 'g', 'm' or 'k' then the
+ * original value is returned
+ */
 function convert_to_bytes($unit, $value)
 {
 	$value = (int) $value;
@@ -1312,7 +1313,42 @@ function convert_to_bytes($unit, $value)
 
 
 /**
- * Whether we are responding to an HTTP GET request
+ * Issue a HTTP status code header.
+ * @param int $code
+ * @param string $message
+ * @return void
+ */
+function qa_http_error($code, $message)
+{
+	$protocol = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.1';
+	$code = (int) $code;
+
+	header("$protocol $code $message");
+}
+
+
+/**
+ * Issue a HTTP 404 header.
+ * @return void
+ */
+function qa_404()
+{
+	qa_http_error('404', 'Not Found');
+}
+
+
+/**
+ * Issue a HTTP 500 header.
+ * @return void
+ */
+function qa_500()
+{
+	qa_http_error('500', 'Internal Server Error');
+}
+
+
+/**
+ * Return true if we are responding to an HTTP GET request
  * @return bool True if the request is GET
  */
 function qa_is_http_get()
@@ -1324,6 +1360,7 @@ function qa_is_http_get()
 
 /**
  * Return true if we are responding to an HTTP POST request
+ * @return bool True if the request is POST
  */
 function qa_is_http_post()
 {
@@ -1335,6 +1372,7 @@ function qa_is_http_post()
 
 /**
  * Return true if we appear to be responding to a secure HTTP request (but hard to be sure)
+ * @return bool
  */
 function qa_is_https_probably()
 {
@@ -1347,6 +1385,7 @@ function qa_is_https_probably()
 /**
  * Return true if it appears the page request is coming from a human using a web browser, rather than a search engine
  * or other bot. Based on a whitelist of terms in user agents, this can easily be tricked by a scraper or bad bot.
+ * @return bool
  */
 function qa_is_human_probably()
 {
@@ -1364,7 +1403,9 @@ function qa_is_human_probably()
 
 
 /**
- * Return true if it appears that the page request is coming from a mobile client rather than a desktop/laptop web browser
+ * Return true if it appears that the page request is coming from a mobile client rather than a desktop/laptop web
+ * browser
+ * @return bool
  */
 function qa_is_mobile_probably()
 {
@@ -1406,7 +1447,7 @@ function qa_is_mobile_probably()
  * loading an option now will cause a problem (see issue in qa_default_option()). The part of
  * $identifier before the slash (/) replaces the * in the qa-lang-*.php file references, and the
  * part after the / is the key of the array element to be taken from that file's returned result.
- * @param $identifier
+ * @param string $identifier
  * @return string
  */
 function qa_lang($identifier)
@@ -1456,8 +1497,8 @@ function qa_lang($identifier)
 
 /**
  * Return the translated string for $identifier, with $symbol substituted for $textparam
- * @param $identifier
- * @param $textparam
+ * @param string $identifier
+ * @param string $textparam
  * @param string $symbol
  * @return mixed
  */
@@ -1469,8 +1510,8 @@ function qa_lang_sub($identifier, $textparam, $symbol = '^')
 
 /**
  * Return the translated string for $identifier, converted to HTML
- * @param $identifier
- * @return mixed|string
+ * @param string $identifier
+ * @return string
  */
 function qa_lang_html($identifier)
 {
@@ -1480,8 +1521,8 @@ function qa_lang_html($identifier)
 
 /**
  * Return the translated string for $identifier converted to HTML, with $symbol *then* substituted for $htmlparam
- * @param $identifier
- * @param $htmlparam
+ * @param string $identifier
+ * @param string $htmlparam
  * @param string $symbol
  * @return mixed
  */
@@ -1494,8 +1535,8 @@ function qa_lang_html_sub($identifier, $htmlparam, $symbol = '^')
 /**
  * Return an array containing the translated string for $identifier converted to HTML, then split into three,
  * with $symbol substituted for $htmlparam in the 'data' element, and obvious 'prefix' and 'suffix' elements
- * @param $identifier
- * @param $htmlparam
+ * @param string $identifier
+ * @param string $htmlparam
  * @param string $symbol
  * @return array
  */
@@ -1519,6 +1560,7 @@ function qa_lang_html_sub_split($identifier, $htmlparam, $symbol = '^')
 
 /**
  * Return the relative path to the Q2A root (if it was previously set by qa_set_request())
+ * @return string
  */
 function qa_path_to_root()
 {
@@ -1531,6 +1573,7 @@ function qa_path_to_root()
 
 /**
  * Return an array of mappings of Q2A requests, as defined in the qa-config.php file
+ * @return array
  */
 function qa_get_request_map()
 {
@@ -1546,11 +1589,11 @@ function qa_get_request_map()
  * Slashes in $request will not be urlencoded, but any other characters will.
  * If $neaturls is set, use that, otherwise retrieve the option. If $rooturl is set, take
  * that as the root of the Q2A site, otherwise use path to root which was set elsewhere.
- * @param $request
- * @param array $params
- * @param string $rooturl
- * @param int $neaturls
- * @param string $anchor
+ * @param string $request
+ * @param array|null $params
+ * @param string|null $rooturl
+ * @param int|null $neaturls
+ * @param string|null $anchor
  * @return string
  */
 function qa_path($request, $params = null, $rooturl = null, $neaturls = null, $anchor = null)
@@ -1624,11 +1667,11 @@ function qa_path($request, $params = null, $rooturl = null, $neaturls = null, $a
 
 /**
  * Return HTML representation of relative URI path for $request - see qa_path() for other parameters
- * @param $request
- * @param array $params
- * @param string $rooturl
- * @param int $neaturls
- * @param string $anchor
+ * @param string $request
+ * @param array|null $params
+ * @param string|null $rooturl
+ * @param int|null $neaturls
+ * @param string|null $anchor
  * @return mixed|string
  */
 function qa_path_html($request, $params = null, $rooturl = null, $neaturls = null, $anchor = null)
@@ -1639,9 +1682,9 @@ function qa_path_html($request, $params = null, $rooturl = null, $neaturls = nul
 
 /**
  * Return the absolute URI for $request - see qa_path() for other parameters
- * @param $request
- * @param array $params
- * @param string $anchor
+ * @param string $request
+ * @param array|null $params
+ * @param string|null $anchor
  * @return string
  */
 function qa_path_absolute($request, $params = null, $anchor = null)
@@ -1673,9 +1716,9 @@ function qa_q_request($questionid, $title)
 
 /**
  * Return the HTML anchor that should be used for post $postid with $basetype (Q/A/C)
- * @param $basetype
- * @param $postid
- * @return mixed|string
+ * @param string $basetype
+ * @param int $postid
+ * @return string
  */
 function qa_anchor($basetype, $postid)
 {
@@ -1688,12 +1731,12 @@ function qa_anchor($basetype, $postid)
 /**
  * Return the URL for question $questionid with $title, possibly using $absolute URLs.
  * To link to a specific answer or comment in a question, set $showtype and $showid accordingly.
- * @param $questionid
- * @param $title
+ * @param int $questionid
+ * @param string $title
  * @param bool $absolute
- * @param string $showtype
- * @param int $showid
- * @return mixed|string
+ * @param string|null $showtype
+ * @param int|null $showid
+ * @return string
  */
 function qa_q_path($questionid, $title, $absolute = false, $showtype = null, $showid = null)
 {
@@ -1714,11 +1757,11 @@ function qa_q_path($questionid, $title, $absolute = false, $showtype = null, $sh
 
 /**
  * Return the HTML representation of the URL for $questionid - other parameters as for qa_q_path()
- * @param $questionid
- * @param $title
- * @param bool $absolute
- * @param string $showtype
- * @param int $showid
+ * @param int $questionid
+ * @param string $title
+ * @param bool|null $absolute
+ * @param string|null $showtype
+ * @param int|null $showid
  * @return mixed|string
  */
 function qa_q_path_html($questionid, $title, $absolute = false, $showtype = null, $showid = null)
@@ -1729,8 +1772,8 @@ function qa_q_path_html($questionid, $title, $absolute = false, $showtype = null
 
 /**
  * Return the request for the specified $feed
- * @param $feed
- * @return mixed|string
+ * @param string $feed
+ * @return string
  */
 function qa_feed_request($feed)
 {
@@ -1742,6 +1785,7 @@ function qa_feed_request($feed)
 
 /**
  * Return an HTML-ready relative URL for the current page, preserving GET parameters - this is useful for action="..." in HTML forms
+ * @return string
  */
 function qa_self_html()
 {
@@ -1756,12 +1800,12 @@ function qa_self_html()
 /**
  * Return HTML for hidden fields to insert into a <form method="get"...> on the page.
  * This is needed because any parameters on the URL will be lost when the form is submitted.
- * @param $request
- * @param array $params
- * @param string $rooturl
- * @param int $neaturls
- * @param string $anchor
- * @return mixed|string
+ * @param string $request
+ * @param array|null $params
+ * @param string|null $rooturl
+ * @param int|null $neaturls
+ * @param string|null $anchor
+ * @return string
  */
 function qa_path_form_html($request, $params = null, $rooturl = null, $neaturls = null, $anchor = null)
 {
@@ -1785,11 +1829,11 @@ function qa_path_form_html($request, $params = null, $rooturl = null, $neaturls 
 
 /**
  * Redirect the user's web browser to $request and then we're done - see qa_path() for other parameters
- * @param $request
- * @param array $params
- * @param string $rooturl
- * @param int $neaturls
- * @param string $anchor
+ * @param string $request
+ * @param array|null $params
+ * @param string|null $rooturl
+ * @param int|null $neaturls
+ * @param string|null $anchor
  * @return mixed
  */
 function qa_redirect($request, $params = null, $rooturl = null, $neaturls = null, $anchor = null)
@@ -1802,7 +1846,7 @@ function qa_redirect($request, $params = null, $rooturl = null, $neaturls = null
 
 /**
  * Redirect the user's web browser to page $path which is already a URL
- * @param $url
+ * @param string $url
  * @return mixed
  */
 function qa_redirect_raw($url)
@@ -1818,8 +1862,8 @@ function qa_redirect_raw($url)
 
 /**
  * Return the contents of remote $url, using file_get_contents() if possible, otherwise curl functions
- * @param $url
- * @return mixed|string
+ * @param string $url
+ * @return bool|string
  */
 function qa_retrieve_url($url)
 {
@@ -1830,14 +1874,19 @@ function qa_retrieve_url($url)
 		return '';
 	}
 
-	$contents = @file_get_contents($url);
+	$contents = '';
 
-	if (!strlen($contents) && function_exists('curl_exec')) { // try curl as a backup (if allow_url_fopen not set)
+	// Due to the design of the file_get_contents function, sometimes getting external content will be very slow.
+	// So we try curl first, if possible. https://stackoverflow.com/q/3629504
+	if (function_exists('curl_exec')) {
 		$curl = curl_init($url);
 		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
 		$contents = @curl_exec($curl);
 		curl_close($curl);
+	}
+
+	if (!strlen($contents)) {
+		$contents = @file_get_contents($url);
 	}
 
 	return $contents;
@@ -1845,10 +1894,40 @@ function qa_retrieve_url($url)
 
 
 /**
+ * Helper function to access the Application object.
+ * @return Application
+ */
+function qa_app()
+{
+	return Application::getInstance();
+}
+
+
+/**
+ * Helper function to get/set services.
+ * If the $key parameter is set and the $object parameter is null the container is called to resolve the $key.
+ * If the $key and the $object parameters are null the container is called to bind the $object to the $key.
+ * @param mixed $key Identifier for the object to get/set.
+ * @param mixed $object Object to set in the $key (if null, a stored object is returned)
+ * @return mixed
+ */
+function qa_service($key, $object = null)
+{
+	$app = Application::getInstance();
+
+	if ($object === null) {
+		return $app->getService($key);
+	}
+
+	$app->registerService($key, $object);
+}
+
+
+/**
  * Shortcut to get or set an option value without specifying database
- * @param $name
- * @param mixed $value
- * @return
+ * @param string $name
+ * @param mixed|null $value
+ * @return string
  */
 function qa_opt($name, $value = null)
 {
@@ -1869,11 +1948,11 @@ function qa_opt($name, $value = null)
 
 /**
  * Simple method to output a preformatted variable
- * @param $var
+ * @param mixed $var
  */
 function qa_debug($var)
 {
-	echo "\n" . '<pre style="padding: 10px; background-color: #eee; color: #444; font-size: 11px; text-align: left">';
+	echo "\n" . '<pre style="padding: 10px; background-color: #eee; color: #444; font-size: 12px; text-align: left; white-space: pre-wrap">';
 	echo $var === null ? 'NULL' : htmlspecialchars(print_r($var, true), ENT_COMPAT|ENT_SUBSTITUTE);
 	echo '</pre>' . "\n";
 }
@@ -1896,12 +1975,12 @@ function qa_suspend_event_reports($suspend = true)
 
 /**
  * Send a notification of event $event by $userid, $handle and $cookieid to all event modules, with extra $params
- * @param $event
- * @param $userid
- * @param $handle
- * @param $cookieid
+ * @param string $event
+ * @param mixed $userid
+ * @param string $handle
+ * @param string $cookieid
  * @param array $params
- * @return mixed|void
+ * @return mixed
  */
 function qa_report_event($event, $userid, $handle, $cookieid, $params = array())
 {
@@ -1917,7 +1996,10 @@ function qa_report_event($event, $userid, $handle, $cookieid, $params = array())
 		$eventmodule->process_event($event, $userid, $handle, $cookieid, $params);
 }
 
-
+/**
+ * Execute the given $method in all process modules. Parameters can be sent as arguments.
+ * @param string $method
+ */
 function qa_report_process_stage($method) // can have extra params
 {
 	global $qa_process_reports_suspended;

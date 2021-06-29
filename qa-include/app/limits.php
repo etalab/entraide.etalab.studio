@@ -44,8 +44,9 @@ define('QA_LIMIT_WALL_POSTS', 'W');
  */
 function qa_user_limits_remaining($action)
 {
-	$userlimits = qa_db_get_pending_result('userlimits', qa_db_user_limits_selectspec(qa_get_logged_in_userid()));
-	$iplimits = qa_db_get_pending_result('iplimits', qa_db_ip_limits_selectspec(qa_remote_ip_address()));
+	$dbSelect = qa_service('dbselect');
+	$userlimits = $dbSelect->getPendingResult('userlimits', qa_db_user_limits_selectspec(qa_get_logged_in_userid()));
+	$iplimits = $dbSelect->getPendingResult('iplimits', qa_db_ip_limits_selectspec(qa_remote_ip_address()));
 
 	return qa_limits_calc_remaining($action, @$userlimits[$action], @$iplimits[$action]);
 }
@@ -167,7 +168,7 @@ function qa_is_ip_blocked()
 
 /**
  * Return an array of the clauses within $blockipstring, each of which can contain hyphens or asterisks
- * @param $blockipstring
+ * @param string $blockipstring
  * @return array
  */
 function qa_block_ips_explode($blockipstring)
@@ -216,9 +217,9 @@ function qa_block_ip_match($ip, $blockipclause)
 
 /**
  * Check if IP falls between two others.
- * @param $ip
- * @param $startip
- * @param $endip
+ * @param string $ip
+ * @param string $startip
+ * @param string $endip
  * @return bool
  */
 function qa_ip_between($ip, $startip, $endip)
@@ -254,26 +255,26 @@ function qa_ipv6_expand($ip)
 		$ipv6_wildcard = true;
 	}
 	if ($ipv6_wildcard) {
-		$wildcards = explode(":", $ip);
+		$wildcards = explode(':', $ip);
 		foreach ($wildcards as $index => $value) {
 			if ($value == "*") {
 				$wildcards_matched[] = count($wildcards) - 1 - $index;
 				$wildcards[$index] = "0";
 			}
 		}
-		$ip = implode($wildcards, ":");
+		$ip = implode(':', $wildcards);
 	}
 
 	$hex = unpack("H*hex", @inet_pton($ip));
 	$ip = substr(preg_replace("/([0-9A-Fa-f]{4})/", "$1:", $hex['hex']), 0, -1);
 
 	if ($ipv6_wildcard) {
-		$wildcards = explode(":", $ip);
+		$wildcards = explode(':', $ip);
 		foreach ($wildcards_matched as $value) {
 			$i = count($wildcards) - 1 - $value;
 			$wildcards[$i] = "*";
 		}
-		$ip = implode($wildcards, ":");
+		$ip = implode(':', $wildcards);
 	}
 
 	return $ip;
@@ -294,7 +295,7 @@ function qa_report_write_action($userid, $cookieid, $action, $questionid, $answe
 
 /**
  * Take note for rate limits that a user and/or the requesting IP just performed an action.
- * @param int $userid User performing the action.
+ * @param int|null $userid User performing the action.
  * @param string $action One of the QA_LIMIT_* constants defined above.
  * @return mixed
  */

@@ -27,31 +27,32 @@ if (!defined('QA_VERSION')) { // don't allow this page to be requested directly 
 
 /**
  * Create a notice for $userid with $content in $format and optional $tags (not displayed) and return its noticeid
- * @param $userid
- * @param $content
+ * @param mixed $userid
+ * @param string $content
  * @param string $format
- * @param $tags
+ * @param string|null $tags
  * @return mixed
  */
 function qa_db_usernotice_create($userid, $content, $format = '', $tags = null)
 {
-	qa_db_query_sub(
-		'INSERT INTO ^usernotices (userid, content, format, tags, created) VALUES ($, $, $, $, NOW())',
-		$userid, $content, $format, $tags
+	$db = qa_service('database');
+	$db->query(
+		'INSERT INTO ^usernotices (userid, content, format, tags, created) VALUES (?, ?, ?, ?, NOW())',
+		[$userid, $content, $format, $tags]
 	);
 
-	return qa_db_last_insert_id();
+	return $db->lastInsertId();
 }
 
 
 /**
  * Delete the notice $notice which belongs to $userid
- * @param $userid
- * @param $noticeid
+ * @param mixed $userid
+ * @param int $noticeid
  */
 function qa_db_usernotice_delete($userid, $noticeid)
 {
-	qa_db_query_sub(
+	qa_service('database')->query(
 		'DELETE FROM ^usernotices WHERE userid=$ AND noticeid=#',
 		$userid, $noticeid
 	);
@@ -60,13 +61,13 @@ function qa_db_usernotice_delete($userid, $noticeid)
 
 /**
  * Return an array summarizing the notices to be displayed for $userid, including the tags (not displayed)
- * @param $userid
+ * @param mixed $userid
  * @return array
  */
 function qa_db_usernotices_list($userid)
 {
-	return qa_db_read_all_assoc(qa_db_query_sub(
-		'SELECT noticeid, tags, UNIX_TIMESTAMP(created) AS created FROM ^usernotices WHERE userid=$ ORDER BY created',
-		$userid
-	));
+	return qa_service('database')->query(
+		'SELECT noticeid, tags, UNIX_TIMESTAMP(created) AS created FROM ^usernotices WHERE userid=? ORDER BY created',
+		[$userid]
+	)->fetchAllAssoc();
 }
