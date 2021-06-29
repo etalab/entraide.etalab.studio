@@ -14,7 +14,7 @@ Cette application est une plateforme d'échange et d'entraide pour les agents de
 - Créer la base de données avec `dokku mariadb:create <nom_db>`
 - Lier la base de données à l'application `dokku mariadb:link <nom_db> <nom_application>`
 
-**Attention** : La commande ci-dessus va afficher dans la console l'adresse de la base de donnée SQL sous cette forme : 
+**Attention** : La commande ci-dessus va afficher dans la console l'adresse de la base de données SQL sous cette forme : 
 
 `<protocole>://<nom_utilisateur>:<mot_de_passe>@<nom_hote>:<port>/<nom_db>`
 
@@ -35,7 +35,7 @@ Cette application est une plateforme d'échange et d'entraide pour les agents de
 - Préparer le push de la branche locale contenant les variables de connexion à la base de données :
 
 ```
-  git remote add dokku sokku@<ip_serveur>:<nom_application>
+  git remote add dokku dokku@<ip_serveur>:<nom_application>
   git checkout -b deploy
   git add qa-config.php
   git commit -m "Credentials database"
