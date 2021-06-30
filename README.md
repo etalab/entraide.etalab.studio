@@ -24,9 +24,9 @@ Cette application est une plateforme d'échange et d'entraide pour les agents de
 - Éditer le `.gitignore`, il faut enlever cette section : 
 
 ```
-    # Ignore Q2A config file and .htaccess in development
-    /qa-config.php
-    /.htaccess
+  # Ignore Q2A config file and .htaccess in development
+  /qa-config.php
+  /.htaccess
 ```
 
 - Renommer le `qa-config-example.php` en `qa-config.php`
@@ -34,11 +34,11 @@ Cette application est une plateforme d'échange et d'entraide pour les agents de
 - Éditer le fichier `qa-config.php` à la racine du projet, il faut préciser les variables de connexion à la base de données :
 
 ```
-    define('QA_MYSQL_HOSTNAME', '<nom_hote>');
-    define('QA_MYSQL_PORT', '<port>');
-    define('QA_MYSQL_USERNAME', '<nom_utilisateur>');
-    define('QA_MYSQL_PASSWORD', getenv('DATABASE_PASSWORD'));
-    define('QA_MYSQL_DATABASE', '<nom_db>');
+  define('QA_MYSQL_HOSTNAME', '<nom_hote>');
+  define('QA_MYSQL_PORT', '<port>');
+  define('QA_MYSQL_USERNAME', '<nom_utilisateur>');
+  define('QA_MYSQL_PASSWORD', getenv('DATABASE_PASSWORD'));
+  define('QA_MYSQL_DATABASE', '<nom_db>');
 ```
 
 - Préparer le push de la branche locale contenant les variables de connexion à la base de données :
