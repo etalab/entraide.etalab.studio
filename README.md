@@ -21,6 +21,15 @@ Cette application est une plateforme d'échange et d'entraide pour les agents de
 - Récupérer le projet avec `git clone https://github.com/etalab/entraide.etalab.studio.git`
 
 - Accéder au dossier avec `cd entraide.etalab.studio`
+- Éditer le `.gitignore`, il faut enlever cette section : 
+
+```
+    # Ignore Q2A config file and .htaccess in development
+    /qa-config.php
+    /.htaccess
+```
+
+- Renommer le `qa-config-example.php` en `qa-config.php`
 
 - Éditer le fichier `qa-config.php` à la racine du projet, il faut préciser les variables de connexion à la base de données :
 
@@ -49,9 +58,8 @@ Cette application est une plateforme d'échange et d'entraide pour les agents de
 
 - Créer un compte administrateur lors de la première connexion
 
-- Sélectionner sur le site, une fois connecté.e avec le compte administrateur dans Admin > Général le [thème Etalab](https://github.com/etalab/q2a-theme-etalab) :
-    - Thème du site
-    - Thème pour mobile
+- Sélectionner sur le site, une fois connecté.e avec le compte administrateur dans Admin > Général le [thème Etalab](https://github.com/etalab/q2a-theme-etalab) : 
+-- Thème du site
+-- Thème pour mobile
 
 ## Licence et contribution
-
